@@ -1,37 +1,12 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
-const validator = require("validator");
 
 const userSchema = new mongoose.Schema(
   {
-    email: {
-      type: String,
-      required: true,
-      unique: true,
-      lowercase: true,
-      trim: true,
-      validate: {
-        validator: (value) => validator.isEmail(value),
-        message: "Invalid email format",
-      },
-    },
-    password: {
-      type: String,
-      required: true,
-      minlength: 8,
-      select: false, // Don't return password by default
-    },
-    name: {
-      type: String,
-      required: true,
-      trim: true,
-      minlength: 2,
-      maxlength: 30,
-    },
     username: {
       type: String,
+      required: true,
       unique: true,
-      sparse: true, // Allows multiple null values
       trim: true,
       minlength: 3,
       maxlength: 30,
@@ -40,6 +15,12 @@ const userSchema = new mongoose.Schema(
         /^[a-z0-9_]+$/,
         "Username can only contain lowercase letters, numbers, and underscores",
       ],
+    },
+    password: {
+      type: String,
+      required: true,
+      minlength: 8,
+      select: false, // Don't return password by default
     },
   },
   {

@@ -1,9 +1,10 @@
 const CoffeeShop = require("../models/coffeeShop");
-const BadRequestError = require("../errors/BadRequestError");
-const NotFoundError = require("../errors/NotFoundError");
-const ForbiddenError = require("../errors/ForbiddenError");
+const {
+  BadRequestError,
+  NotFoundError,
+  ForbiddenError,
+} = require("../utils/errors");
 
-// Get all saved coffee shops for the current user
 const getCoffeeShops = async (req, res, next) => {
   try {
     const userId = req.user.userId;
@@ -17,7 +18,6 @@ const getCoffeeShops = async (req, res, next) => {
   }
 };
 
-// Create a new saved coffee shop
 const createCoffeeShop = async (req, res, next) => {
   try {
     const userId = req.user.userId;
@@ -50,7 +50,6 @@ const createCoffeeShop = async (req, res, next) => {
   }
 };
 
-// Delete a saved coffee shop by _id
 const deleteCoffeeShop = async (req, res, next) => {
   try {
     const userId = req.user.userId;
@@ -62,7 +61,6 @@ const deleteCoffeeShop = async (req, res, next) => {
       throw new NotFoundError("Coffee shop not found");
     }
 
-    // Check if the coffee shop belongs to the user
     if (coffeeShop.owner.toString() !== userId) {
       throw new ForbiddenError(
         "You don't have permission to delete this coffee shop",

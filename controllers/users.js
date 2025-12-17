@@ -15,13 +15,21 @@ const generateToken = (userId) => {
 const createUser = (req, res, next) => {
   const { email, name, password } = req.body;
 
-  User.findOne({ email })
+  const normalizedEmail = email.toLowerCase().trim();
+
+  User.findOne({ email: normalizedEmail })
     .then((existingUser) => {
       if (existingUser) {
         throw new ConflictError("Email already registered");
       }
 
-      return User.create({ email, name, password });
+      const newUser = new User({
+        email: normalizedEmail,
+        name: name.trim(),
+        password: String(password),
+      });
+
+      return newUser.save();
     })
     .then((user) => {
       const token = generateToken(user._id);
@@ -36,18 +44,29 @@ const createUser = (req, res, next) => {
       });
     })
     .catch((error) => {
+      if (error.statusCode) {
+        return next(error);
+      }
+
       if (error.name === "ValidationError") {
         next(new BadRequestError("Invalid input data"));
       } else if (error.code === 11000) {
-        // MongoDB duplicate key error
-        next(new ConflictError("Email already exists"));
+        const duplicateField = error.keyPattern
+          ? Object.keys(error.keyPattern)[0]
+          : "field";
+
+        if (duplicateField === "email") {
+          next(new ConflictError("Email already exists"));
+        } else {
+          next(new ConflictError(`Duplicate ${duplicateField}`));
+        }
       } else {
+        console.error("Unexpected registration error:", error);
         next(error);
       }
     });
 };
 
-// Login user
 const login = (req, res, next) => {
   const { email, password } = req.body;
 
@@ -55,14 +74,49 @@ const login = (req, res, next) => {
     return next(new BadRequestError("Email and password are required"));
   }
 
-  User.findOne({ email })
+  const normalizedEmail = email.toLowerCase().trim();
+
+  User.findOne({ email: normalizedEmail })
     .select("+password")
+    .then((user) => {
+      if (!user) {
+        return User.findOne({
+          email: {
+            $regex: new RegExp(
+              `^${normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+              "i",
+            ),
+          },
+        }).select("+password");
+      }
+      return user;
+    })
     .then((user) => {
       if (!user) {
         throw new UnauthorizedError("Invalid email or password");
       }
 
-      return user.comparePassword(password).then((isMatch) => {
+      if (!user.password) {
+        throw new UnauthorizedError("Invalid email or password");
+      }
+
+      const passwordToCompare = String(password);
+
+      // Debug: Log password comparison attempt (remove in production)
+      if (process.env.NODE_ENV === "development") {
+        console.log("Login attempt:", {
+          email: normalizedEmail,
+          passwordLength: passwordToCompare.length,
+          hasPasswordHash: !!user.password,
+          hashLength: user.password ? user.password.length : 0,
+        });
+      }
+
+      return user.comparePassword(passwordToCompare).then((isMatch) => {
+        if (process.env.NODE_ENV === "development") {
+          console.log("Password match result:", isMatch);
+        }
+
         if (!isMatch) {
           throw new UnauthorizedError("Invalid email or password");
         }
@@ -80,6 +134,11 @@ const login = (req, res, next) => {
       });
     })
     .catch((error) => {
+      // If it's already a custom error, pass it through
+      if (error.statusCode) {
+        return next(error);
+      }
+      // Otherwise, it's an unexpected error
       next(error);
     });
 };
@@ -131,21 +190,21 @@ const updateUser = (req, res, next) => {
 
   checkEmail()
     .then(() => {
-      const updateData = {};
-      if (name) updateData.name = name;
-      if (email) updateData.email = email;
-      if (password) updateData.password = password; // Will be hashed by pre-save hook
-
-      return User.findByIdAndUpdate(userId, updateData, {
-        new: true,
-        runValidators: true,
-      });
+      // Use findById + save so Mongoose pre-save hooks run (password hashing)
+      return User.findById(userId);
     })
     .then((user) => {
       if (!user) {
         throw new NotFoundError("User not found");
       }
 
+      if (name) user.name = name;
+      if (email) user.email = email;
+      if (password) user.password = String(password);
+
+      return user.save();
+    })
+    .then((user) => {
       res.json({
         user: {
           id: user._id,

@@ -31,7 +31,6 @@ app.post("/api/signup", validateCreateUserBody, createUser);
 
 app.use("/api", routes);
 
-// Handle 404 for API routes
 app.use("/api/*", (req, res, next) => {
   const { NotFoundError } = require("./utils/errors");
   next(new NotFoundError("The requested resource was not found"));

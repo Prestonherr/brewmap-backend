@@ -9,10 +9,12 @@ module.exports = (err, req, res, next) => {
       ? "An error has occurred on the server"
       : err.message || "An error has occurred";
 
-  // Handle Celebrate/Joi validation errors
   if (err.isCelebrate) {
     statusCode = 400;
-    const details = err.details.get("body") || err.details.get("params") || err.details.get("query");
+    const details =
+      err.details.get("body") ||
+      err.details.get("params") ||
+      err.details.get("query");
     if (details && details.details && details.details.length > 0) {
       message = details.details[0].message || "Validation error";
     } else {

@@ -13,7 +13,7 @@ const errorHandler = require("./middlewares/error-handler");
 const { requestLogger, errorLogger } = require("./middlewares/logger");
 
 const app = express();
-const { PORT = 3000 } = process.env;
+const { PORT = 3001 } = process.env;
 
 app.use(express.json());
 
@@ -26,10 +26,16 @@ app.use(cors());
 
 app.use(requestLogger);
 
-app.post("/signin", validateLoginBody, login);
-app.post("/signup", validateCreateUserBody, createUser);
+app.post("/api/signin", validateLoginBody, login);
+app.post("/api/signup", validateCreateUserBody, createUser);
 
-app.use(routes);
+app.use("/api", routes);
+
+// Handle 404 for API routes
+app.use("/api/*", (req, res, next) => {
+  const { NotFoundError } = require("./utils/errors");
+  next(new NotFoundError("The requested resource was not found"));
+});
 
 app.use(errorLogger);
 

@@ -1,20 +1,26 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
+const validator = require("validator");
 
 const userSchema = new mongoose.Schema(
   {
-    username: {
+    email: {
       type: String,
       required: true,
       unique: true,
-      trim: true,
-      minlength: 3,
-      maxlength: 30,
       lowercase: true,
-      match: [
-        /^[a-z0-9_]+$/,
-        "Username can only contain lowercase letters, numbers, and underscores",
-      ],
+      trim: true,
+      validate: {
+        validator: (value) => validator.isEmail(value),
+        message: "Invalid email format",
+      },
+    },
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+      minlength: 2,
+      maxlength: 30,
     },
     password: {
       type: String,
@@ -29,22 +35,27 @@ const userSchema = new mongoose.Schema(
 );
 
 // Hash password before saving
-userSchema.pre("save", async function (next) {
+userSchema.pre("save", function (next) {
   if (!this.isModified("password")) {
     return next();
   }
 
-  try {
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
-    next();
-  } catch (error) {
-    next(error);
-  }
+  bcrypt
+    .genSalt(10)
+    .then((salt) => {
+      return bcrypt.hash(this.password, salt);
+    })
+    .then((hash) => {
+      this.password = hash;
+      next();
+    })
+    .catch((error) => {
+      next(error);
+    });
 });
 
 // Instance method to compare passwords
-userSchema.methods.comparePassword = async function (candidatePassword) {
+userSchema.methods.comparePassword = function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };
 

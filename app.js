@@ -19,7 +19,9 @@ app.use(express.json());
 
 mongoose
   .connect("mongodb://127.0.0.1:27017/brewmap")
-  .then(() => {})
+  .then(() => {
+    console.log("Connected to MongoDB");
+  })
   .catch(console.error);
 
 app.use(cors());
@@ -42,4 +44,6 @@ app.use(errors());
 
 app.use(errorHandler);
 
-app.listen(PORT, () => {});
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});

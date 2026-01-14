@@ -26,7 +26,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
       minlength: 6,
-      select: false, // Don't return password by default
+      select: false,
     },
   },
   {
@@ -34,14 +34,11 @@ const userSchema = new mongoose.Schema(
   },
 );
 
-// Hash password before saving
 userSchema.pre("save", async function () {
-  // Only hash if password is modified
   if (!this.isModified("password")) {
     return;
   }
 
-  // Check if password is already hashed (bcrypt hashes start with $2 and are 60 chars)
   if (
     this.password &&
     this.password.startsWith("$2") &&

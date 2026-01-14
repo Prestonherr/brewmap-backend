@@ -28,10 +28,11 @@ const coffeeShopSchema = new mongoose.Schema(
       type: Number,
     },
     tags: {
-      type: Object,
-      default: {},
+      type: mongoose.Schema.Types.Mixed,
+      default: function () {
+        return {};
+      },
     },
-    // Store the original OSM ID if it came from Overpass API
     osmId: {
       type: String,
     },
@@ -41,7 +42,6 @@ const coffeeShopSchema = new mongoose.Schema(
   },
 );
 
-// Index for efficient queries by owner
 coffeeShopSchema.index({ owner: 1 });
 
 module.exports = mongoose.model("CoffeeShop", coffeeShopSchema);

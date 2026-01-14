@@ -1,16 +1,15 @@
+const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/user");
 const { JWT_SECRET } = require("../utils/config");
 const {
+  NOT_FOUND,
   BadRequestError,
   ConflictError,
   UnauthorizedError,
   NotFoundError,
 } = require("../utils/errors");
-
-const generateToken = (userId) => {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: "7d" });
-};
 
 const createUser = (req, res, next) => {
   const { email, name, password } = req.body;
@@ -32,7 +31,9 @@ const createUser = (req, res, next) => {
       return newUser.save();
     })
     .then((user) => {
-      const token = generateToken(user._id);
+      const token = jwt.sign({ _id: user._id }, JWT_SECRET, {
+        expiresIn: "7d",
+      });
 
       res.status(201).json({
         user: {
@@ -80,72 +81,38 @@ const login = (req, res, next) => {
     .select("+password")
     .then((user) => {
       if (!user) {
-        return User.findOne({
-          email: {
-            $regex: new RegExp(
-              `^${normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
-              "i",
-            ),
-          },
-        }).select("+password");
+        throw new UnauthorizedError("Incorrect email or password");
       }
-      return user;
+      return user.comparePassword(password).then((isPasswordCorrect) => {
+        if (!isPasswordCorrect) {
+          throw new UnauthorizedError("Incorrect email or password");
+        }
+        return user;
+      });
     })
     .then((user) => {
-      if (!user) {
-        throw new UnauthorizedError("Invalid email or password");
-      }
-
-      if (!user.password) {
-        throw new UnauthorizedError("Invalid email or password");
-      }
-
-      const passwordToCompare = String(password);
-
-      // Debug: Log password comparison attempt (remove in production)
-      if (process.env.NODE_ENV === "development") {
-        console.log("Login attempt:", {
-          email: normalizedEmail,
-          passwordLength: passwordToCompare.length,
-          hasPasswordHash: !!user.password,
-          hashLength: user.password ? user.password.length : 0,
-        });
-      }
-
-      return user.comparePassword(passwordToCompare).then((isMatch) => {
-        if (process.env.NODE_ENV === "development") {
-          console.log("Password match result:", isMatch);
-        }
-
-        if (!isMatch) {
-          throw new UnauthorizedError("Invalid email or password");
-        }
-
-        const token = generateToken(user._id);
-
-        res.json({
-          user: {
-            id: user._id,
-            email: user.email,
-            name: user.name,
-          },
-          token,
-        });
+      const token = jwt.sign({ _id: user._id }, JWT_SECRET, {
+        expiresIn: "7d",
+      });
+      return res.status(200).json({
+        token,
+        user: {
+          id: user._id,
+          email: user.email,
+          name: user.name,
+        },
       });
     })
     .catch((error) => {
-      // If it's already a custom error, pass it through
       if (error.statusCode) {
         return next(error);
       }
-      // Otherwise, it's an unexpected error
-      next(error);
+      next(new UnauthorizedError("Incorrect email or password"));
     });
 };
 
-// Get current user
 const getCurrentUser = (req, res, next) => {
-  User.findById(req.user.userId)
+  User.findById(req.user._id)
     .then((user) => {
       if (!user) {
         throw new NotFoundError("User not found");
@@ -168,10 +135,9 @@ const getCurrentUser = (req, res, next) => {
     });
 };
 
-// Update user
 const updateUser = (req, res, next) => {
   const { name, email, password } = req.body;
-  const userId = req.user.userId;
+  const userId = req.user._id;
 
   const checkEmail = () => {
     if (!email) {
@@ -190,7 +156,6 @@ const updateUser = (req, res, next) => {
 
   checkEmail()
     .then(() => {
-      // Use findById + save so Mongoose pre-save hooks run (password hashing)
       return User.findById(userId);
     })
     .then((user) => {
@@ -219,7 +184,6 @@ const updateUser = (req, res, next) => {
       } else if (error.name === "CastError") {
         next(new BadRequestError("Invalid user ID format"));
       } else if (error.code === 11000) {
-        // MongoDB duplicate key error
         next(new ConflictError("Email already exists"));
       } else {
         next(error);

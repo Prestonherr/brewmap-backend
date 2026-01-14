@@ -6,7 +6,7 @@ const {
 } = require("../utils/errors");
 
 const getCoffeeShops = (req, res, next) => {
-  const userId = req.user.userId;
+  const userId = req.user._id;
   CoffeeShop.find({ owner: userId })
     .sort({ createdAt: -1 })
     .then((coffeeShops) => {
@@ -18,7 +18,7 @@ const getCoffeeShops = (req, res, next) => {
 };
 
 const createCoffeeShop = (req, res, next) => {
-  const userId = req.user.userId;
+  const userId = req.user._id;
   const { name, address, lat, lon, distance, tags, osmId } = req.body;
 
   if (!name || lat === undefined || lon === undefined) {
@@ -52,7 +52,7 @@ const createCoffeeShop = (req, res, next) => {
 };
 
 const deleteCoffeeShop = (req, res, next) => {
-  const userId = req.user.userId;
+  const userId = req.user._id;
   const { coffeeShopId } = req.params;
 
   CoffeeShop.findById(coffeeShopId)
